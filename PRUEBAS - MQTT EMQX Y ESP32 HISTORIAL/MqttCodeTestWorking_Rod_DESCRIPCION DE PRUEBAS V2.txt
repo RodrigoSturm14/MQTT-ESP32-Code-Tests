@@ -1,0 +1,114 @@
+/*
+   MQTT (OVER TCP) TESTS CON WIFI ESP32:
+
+ |CONDICIONES:
+ESP32 CONECTADO A WIFI PPASINOMAS.
+MONITOR SERIAL EN PC.
+BROKER MQTT 3.1.1 ONLINE EMQX EN PC, CONECTADA A RED WIFI PPASINOMAS.
+BROKER MQTT 3.1.1 ONLINE EMQX EN NOTEBOOK, CONECTADA A RED WIFI C6EA7C.
+ENVIO DE MENSAJES DESDE EL BROKER AL ESP32.
+USERNAME EN EL BROKER Y ESP32: RodSturm.
+PASSWORD EN EL BROKER Y ESP32: racing2018.
+
+ -- PRUEBAS 22/04/23:
+ENVIO DE MENSAJES AL ESP32 EN FORMATO PLAINTEXT, JSON, HEX, BASE64.----> BIEN.
+ENVIO DE MENSAJES AL ESP32 DESDE NOTEBOOK, CONECTADA A RED WIFI C6EA7C.----> BIEN
+CAMBIO DE USERNAME Y PASSWORD EN EL BROKER.----> LA CONEXION AL BROKER NO SE VIO AFECTADA.
+USO DEL NOMBRE Esp32/Test EN New subscription Y EN Topic.----> LOS MENSAJES ENVIADOS DESDE EL BROKER ERAN NUEVAMENTE ENVIADOS Y PUBLICADOS POR EL ESP32 EN EL BROKER.
+CAMBIO DE NOMBRES EN Topic (EL BROKER Y EL ESP32 MANEJABAN EL MISMO NOMBRE DEL Topic).----> LOS MENSAJES ERAN RECIBIDOS CORRECTAMENTE.
+USO DE DIFERENTES Connections.----> LOS MENSAJES SE ENVIABAN Y RECIBIAN CORRECTAMENTE SIMPRE Y CUANDO EL NOMBRE DE Topic SEAN IGUALES EN EL BROKER Y ESP32.
+
+ENVIO DE 0 Y 1 DESDE EL BROKER PARA ENCENDER LED PIN 18 (PIN SIN NINGUN ADC).----> BIEN.
+ENVIO DE CADENAS DE CARACTERES DESDE EL BROKER.----> LA VARIABLE payload_string ALMACENA CORRECTAMENTE EL MENSAJE, MIENTRAS QUE PAYLOADINT LO ALMACENA COMO 0.
+	***(SE CREO LA VARIABLE PAYLOADINT PARA PASAR LOS VALORES DE LA VARIABLE STRING payload_string A UN DATO ENTERO)***
+
+*/
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+// WiFi
+const char *ssid = "ppasinomas";     // Enter your WiFi name
+const char *password = "Pepe2013=";  // Enter WiFi password
+
+// MQTT Broker
+const char *mqtt_broker = "broker.emqx.io";  // broker address
+const char *topic = "Esp32/Test";            // define topic
+const char *mqtt_username = "RodSturmm";     // username for authentication
+const char *mqtt_password = "racing20188";   // password for authentication
+const int mqtt_port = 1883;                  // port of MQTT over TCP
+
+// Output control components
+#define PINLED 18
+int PAYLOADINT;
+
+// Define espClient as a WiFiClient object class and  client as PubSubClient object class.
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup() {
+  // Set PINLED as output
+  pinMode(PINLED, OUTPUT);
+  // Set software serial baud to 115200;
+  Serial.begin(115200);
+  // connecting to a WiFi network
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to the WiFi network");
+  //connecting to a mqtt broker
+  client.setServer(mqtt_broker, mqtt_port);
+  client.setCallback(callback);
+  while (!client.connected()) {
+    String client_id = "esp32-client-";
+    client_id += String(WiFi.macAddress());
+    Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
+    if (client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
+      Serial.println("Public emqx mqtt broker connected");
+    } else {
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(2000);
+    }
+  }
+  // publish and subscribe
+  client.publish(topic, "Hola EMQX I'm ESP32 ^^");
+  client.subscribe(topic);
+}
+
+void callback(char *topic, byte *payload, unsigned int length) {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+  Serial.print("Message:");
+
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  
+  char payload_string[length + 1];
+
+  memcpy(payload_string, payload, length);
+  payload_string[length] = '\0';
+  PAYLOADINT = atoi(payload_string);
+
+  Serial.println();
+  Serial.print("Payload as a integer:");
+  Serial.print(PAYLOADINT);
+
+  Serial.println();
+  Serial.println("-----------------------");
+  
+  if(PAYLOADINT == 1){
+    digitalWrite(PINLED, HIGH);
+  }
+  else if(PAYLOADINT == 0){
+    digitalWrite(PINLED, LOW);
+  } 
+
+}
+
+void loop() {
+  client.loop();
+}

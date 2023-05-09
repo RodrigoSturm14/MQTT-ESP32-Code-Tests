@@ -1,0 +1,84 @@
+/*
+   		BLE (BLUETOOTH LOW ENERGY) TESTS CON ESP32:
+------------------------------------------------------------------------
+ |CONDICIONES 01/05/23:
+ESP32 CONECTADO A BLUETOOTH DEL CELULAR Y MONITOR SERIAL EN PC.
+CELULAR CONECTADO AL ESP32 CON APLICACION Bluetooth Terminal.
+ENVIO DE MENSAJES DESDE EL CELULAR AL ESP32.
+------------------------------------------------------------------------
+
+ -- PRUEBAS 01/05/23:
+ENVIO DE MENSAJES AL ESP32 DESDE EL Bluetooth Terminal.----> BIEN.
+ENVIO DE MENSAJES AL Bluetooth Terminal DESDE ESP32.----> FUNCION SerialBluetoothTerminal.print("MENSAJE DESDE EL ESP32") FUNCIONA. SerialBluetoothTerminal.write("MENSAJE DESDE EL ESP32") PARA MENSAJES NO FUNCIONA.
+ENVIO DE PALABRAS, ORACIONES, NUMEROS, CARACTERES ESPECIALES Y ... EMOJIS? .----> BIEN.
+APAGAR BLUETOOTH CUANDO EL ESP32 LEE 1.----> BIEN.
+
+APAGAR BLUETOOTH CUANDO EL ESP32 LEE LISTO.----> BIEN.
+
+TRANSFORMAR LAS LINEAS DE <RECIBIR E IMPRIMIR> LOS MENSAJES ENVIADOS DESDE EL Bluetooth Terminal EN FUNCION.----> BIEN, String recibir_mensajes_bluetoothterminal() NO NECESITA TENER PARAMETROS DE ENTRADA (inputs), YA QUE SOLAMENTE REALIZA UNA TAREA Y LUEGO DEVUELVE UN VALOR (finalmessage), POR LO TANTO NO ES NECESARIO UN VALOR DE ENTRADA PARA LA FUNCION.
+TRANSFORMAR LAS LINEAS DE <APAGAR BLUETOOTH DEL ESP32> EN FUNCION.----> BIEN.
+
+ -- PRUEBAS 25/04/23:
+*/
+
+#include "BluetoothSerial.h"
+
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+BluetoothSerial SerialBluetoothTerminal;
+
+// Handle received messages
+char incomingChar;         // Each letter of the message will be received and stored here, one at a time.
+String finalmessage = "";  // Every letter from incomingChar will be concatenated and will form a string.
+//String confirmacion = "";
+
+String recibir_mensajes_bluetoothterminal(){
+
+  if (SerialBluetoothTerminal.available()) {
+
+    incomingChar = SerialBluetoothTerminal.read();
+
+    if (incomingChar != '\n') {
+
+      finalmessage += String(incomingChar);
+    }
+
+    else {
+
+      finalmessage = "";
+    }
+
+    //Serial.write(incomingChar);
+    Serial.println("-------");
+    Serial.println(finalmessage);
+    //confirmacion == finalmessage;  ---> no se almacenan strings en otros strings de esta forma
+  }
+
+  return finalmessage;
+}
+
+void cortar_bluetooth_con_LISTO (){
+
+  if (finalmessage == "LISTO") {
+
+    SerialBluetoothTerminal.end();
+    SerialBluetoothTerminal.print("MENSAJE FUERA DEL BLUETOOTH");
+    Serial.println("MENSAJE SIN BLUETOOTH");
+    delay(3000);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  SerialBluetoothTerminal.begin("ESP32test");  //Bluetooth device name
+  Serial.println("The device started, now you can pair it with bluetooth!");
+}
+
+void loop() {
+  
+  recibir_mensajes_bluetoothterminal();
+
+  cortar_bluetooth_con_LISTO ();
+}
